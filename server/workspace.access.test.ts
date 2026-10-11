@@ -28,7 +28,7 @@ function appRouterContextForUser(): TrpcContext {
     openId: "member-user",
     email: "member@example.com",
     name: "Member User",
-    loginMethod: "manus",
+    loginMethod: "password",
     role: "user",
     createdAt: new Date(),
     updatedAt: new Date(),
