@@ -1,4 +1,3 @@
-import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
@@ -95,11 +94,14 @@ export default function Home() {
   const memberQuery = trpc.workspace.members.useQuery(undefined, { enabled: isAuthenticated });
   const committeeQuery = trpc.workspace.committees.useQuery(undefined, { enabled: isAuthenticated });
   const createMember = trpc.workspace.createMember.useMutation();
+  const login = trpc.auth.login.useMutation();
   const queryUtils = trpc.useUtils();
   const [activeSection, setActiveSection] = useState<Section>("overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [tasks, setTasks] = useState<Task[]>(defaultTasks);
@@ -125,6 +127,19 @@ export default function Home() {
     () => tasks.filter((task) => `${task.title} ${task.committee} ${task.status}`.toLowerCase().includes(search.toLowerCase())),
     [tasks, search],
   );
+
+  const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setLoginError("");
+    try {
+      await login.mutateAsync({ email: String(form.get("email") ?? ""), password: String(form.get("password") ?? "") });
+      await queryUtils.auth.me.invalidate();
+      setIsLoginOpen(false);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "حصلت مشكلة في تسجيل الدخول.");
+    }
+  };
 
   const showToast = (message: string) => {
     setToast(message);
@@ -227,7 +242,7 @@ export default function Home() {
                 <button className="logout-button" onClick={() => logout()} aria-label="تسجيل الخروج"><LogOut size={16} /></button>
               </div>
             ) : (
-              <button className="login-button" onClick={() => startLogin()} disabled={loading}><UserRound size={16} /> دخول المسؤول</button>
+              <button className="login-button" onClick={() => setIsLoginOpen(true)} disabled={loading}><UserRound size={16} /> دخول المسؤول</button>
             )}
           </div>
         </header>
@@ -303,6 +318,7 @@ export default function Home() {
       </main>
 
       {isTaskModalOpen && <TaskModal onClose={() => setIsTaskModalOpen(false)} onSubmit={handleTaskSubmit} />}
+      {isLoginOpen && <LoginModal onClose={() => { setIsLoginOpen(false); setLoginError(""); }} onSubmit={handleLoginSubmit} saving={login.isPending} error={loginError} />}
       {isMemberModalOpen && <MemberModal onClose={() => setIsMemberModalOpen(false)} onSubmit={handleMemberSubmit} saving={createMember.isPending} />}
       {toast && <div className="toast"><Check size={17} /> {toast}</div>}
     </div>
@@ -403,3 +419,7 @@ function MemberModal({ onClose, onSubmit, saving }: { onClose: () => void; onSub
 }
 
 export { defaultMembers, defaultTasks };
+
+function LoginModal({ onClose, onSubmit, saving, error }: { onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; saving: boolean; error: string }) {
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="login-modal-title"><div className="modal-head"><div><span className="small-eyebrow">دخول المسؤول</span><h2 id="login-modal-title">تسجيل الدخول</h2></div><button className="icon-button" onClick={onClose} aria-label="إغلاق"><X size={19} /></button></div><form onSubmit={onSubmit}><label>الإيميل<input name="email" type="email" required autoComplete="username" dir="ltr" autoFocus /></label><label>كلمة المرور<input name="password" type="password" required autoComplete="current-password" dir="ltr" /></label>{error && <span role="alert" style={{ color: "#c62828", fontSize: 11, fontWeight: 700 }}>{error}</span>}<div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>إلغاء</button><button type="submit" className="primary-button" disabled={saving}><Check size={16} /> {saving ? "جاري الدخول..." : "دخول"}</button></div></form></div></div>;
+}
